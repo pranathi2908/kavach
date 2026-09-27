@@ -23,7 +23,6 @@ import {
 import { toPng } from "html-to-image";
 import QRCode from "qrcode";
 import jsQR from "jsqr";
-import * as THREE from "three";
 
 declare global {
   interface Window {
@@ -53,7 +52,6 @@ type Screen =
   | "dashboard";
 type ModuleId = "fire" | "gas";
 type CompetencyKey = "hazard" | "response" | "route" | "safety";
-type FireInteractionStep = "search" | "pickup" | "pin" | "aim" | "spray" | "complete";
 
 type WorkerProfile = {
   name: string;
@@ -309,19 +307,53 @@ export default function Page() {
   const [scanStatus, setScanStatus] = useState("Ready to scan certificate");
   const [isSyncing, setIsSyncing] = useState(false);
   const [onlineStatus, setOnlineStatus] = useState(true);
-  const [fireInteractionStep, setFireInteractionStep] = useState<FireInteractionStep>("search");
-  const fireInteractionStepRef = useRef<FireInteractionStep>("search");
-  const firePinDragRef = useRef(false);
-  const fireExtinguisherDragRef = useRef(false);
+  const [detectedObjects, setDetectedObjects] = useState<
+    {
+      label: string;
+      confidence: number;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    }[]
+  >([]);
   const cameraRef = useRef<HTMLVideoElement | null>(null);
   const nativeCameraBoxRef = useRef<HTMLDivElement | null>(null);
-  const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const certificateRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    fireInteractionStepRef.current = fireInteractionStep;
-  }, [fireInteractionStep]);
+    if (typeof window === "undefined") return;
+
+    const handleDetection = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+
+      if (Array.isArray(detail)) {
+        setDetectedObjects(detail);
+        return;
+      }
+
+      if (detail && Array.isArray(detail.objects)) {
+        setDetectedObjects(detail.objects);
+        return;
+      }
+
+      setDetectedObjects([]);
+    };
+
+    window.addEventListener("kavachObjectDetection", handleDetection);
+
+    return () => {
+      window.removeEventListener("kavachObjectDetection", handleDetection);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "scenario") {
+      setDetectedObjects([]);
+    }
+  }, [screen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -338,10 +370,10 @@ export default function Page() {
       const rect = box.getBoundingClientRect();
       const density = window.devicePixelRatio || 1;
       return {
-        left: rect.left * density,
-        top: rect.top * density,
-        width: rect.width * density,
-        height: rect.height * density,
+        left: Math.round(rect.left * density),
+        top: Math.round(rect.top * density),
+        width: Math.round(rect.width * density),
+        height: Math.round(rect.height * density),
       };
     };
 
@@ -377,305 +409,6 @@ export default function Page() {
       window.KavachCamera?.stop();
     };
   }, [screen, scenarioIndex]);
-
-  useEffect(() => {
-    if (screen !== "scenario" || activeModuleId !== "fire") return;
-
-    const canvas = threeCanvasRef.current;
-    const container = nativeCameraBoxRef.current;
-    if (!canvas || !container) return;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-    camera.position.set(0, 0.15, 6);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-      powerPreference: "high-performance",
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0x000000, 0);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 2.2);
-    scene.add(ambient);
-
-    const key = new THREE.DirectionalLight(0xffffff, 3.2);
-    key.position.set(3, 4, 5);
-    scene.add(key);
-
-    const red = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.35, metalness: 0.15 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.5, metalness: 0.1 });
-    const metal = new THREE.MeshStandardMaterial({ color: 0xb8bec7, roughness: 0.25, metalness: 0.85 });
-    const yellow = new THREE.MeshStandardMaterial({ color: 0xf5c542, roughness: 0.4, metalness: 0.2 });
-
-    const extinguisher = new THREE.Group();
-
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.68, 2.05, 32), red);
-    body.position.y = -0.35;
-    extinguisher.add(body);
-
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.28, 24), metal);
-    top.position.y = 0.82;
-    extinguisher.add(top);
-
-    const valve = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.22), dark);
-    valve.position.set(0, 0.99, 0);
-    extinguisher.add(valve);
-
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.11, 0.16), dark);
-    handle.position.set(0, 1.13, 0);
-    extinguisher.add(handle);
-
-    const handleStem = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.12), dark);
-    handleStem.position.set(0.2, 1.0, 0);
-    extinguisher.add(handleStem);
-
-    const pin = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 10, 20), yellow);
-    pin.rotation.x = Math.PI / 2;
-    pin.position.set(-0.22, 0.98, 0.13);
-    pin.userData.interaction = "pin";
-    extinguisher.add(pin);
-
-    // Large invisible hit target around the small yellow pin so it is easy to grab on a phone.
-    const pinHit = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 16, 16),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
-    );
-    pinHit.position.copy(pin.position);
-    pinHit.userData.interaction = "pin";
-    extinguisher.add(pinHit);
-
-    // Large invisible body hit target so the extinguisher is reliably tappable on touchscreens.
-    const bodyHit = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.78, 0.84, 2.25, 24),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
-    );
-    bodyHit.position.copy(body.position);
-    bodyHit.userData.interaction = "extinguisher";
-    extinguisher.add(bodyHit);
-
-    const hoseCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.28, 0.86, 0),
-      new THREE.Vector3(0.68, 0.65, 0),
-      new THREE.Vector3(0.78, 0.1, 0),
-      new THREE.Vector3(0.62, -0.25, 0),
-    ]);
-    const hose = new THREE.Mesh(new THREE.TubeGeometry(hoseCurve, 24, 0.07, 12, false), dark);
-    extinguisher.add(hose);
-
-    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.45, 20), dark);
-    nozzle.rotation.z = -0.55;
-    nozzle.position.set(0.65, -0.32, 0);
-    extinguisher.add(nozzle);
-
-    const label = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, 0.035, 32), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.8 }));
-    label.rotation.x = Math.PI / 2;
-    label.rotation.z = Math.PI / 2;
-    label.position.set(0, -0.25, 0.64);
-    extinguisher.add(label);
-
-    extinguisher.scale.setScalar(0.5);
-    extinguisher.position.set(1.35, -0.9, -1.8);
-    extinguisher.rotation.y = -0.22;
-    scene.add(extinguisher);
-
-    const resize = () => {
-      const width = Math.max(container.clientWidth, 1);
-      const height = Math.max(container.clientHeight, 1);
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-
-    const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2();
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let extinguisherStartX = 0;
-    let extinguisherStartY = 0;
-
-    const getHit = (event: PointerEvent, wanted?: "pin" | "extinguisher") => {
-      const rect = canvas.getBoundingClientRect();
-      pointer.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
-      pointer.y = -((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObject(extinguisher, true);
-
-      if (wanted) {
-        const wantedHit = hits.find((item) => {
-          let object: THREE.Object3D | null = item.object;
-          while (object && object !== extinguisher) {
-            if (object.userData?.interaction === wanted) return true;
-            object = object.parent;
-          }
-          return false;
-        });
-        return wantedHit?.object ?? null;
-      }
-
-      return hits[0]?.object ?? null;
-    };
-
-    const isInteraction = (object: THREE.Object3D | null, type: "pin" | "extinguisher") => {
-      let current = object;
-      while (current && current !== extinguisher) {
-        if (current.userData?.interaction === type) return true;
-        current = current.parent;
-      }
-      return false;
-    };
-
-    const handlePointerDown = (event: PointerEvent) => {
-      event.preventDefault();
-      const step = fireInteractionStepRef.current;
-
-      if (step === "pin") {
-        const pinHitObject = getHit(event, "pin");
-        if (!pinHitObject) return;
-
-        dragStartX = event.clientX;
-        dragStartY = event.clientY;
-        firePinDragRef.current = true;
-        canvas.setPointerCapture?.(event.pointerId);
-        return;
-      }
-
-      if (step === "search" || step === "pickup") {
-        const extinguisherHit = getHit(event, "extinguisher");
-        if (!extinguisherHit) return;
-
-        dragStartX = event.clientX;
-        dragStartY = event.clientY;
-        extinguisherStartX = extinguisher.position.x;
-        extinguisherStartY = extinguisher.position.y;
-        fireExtinguisherDragRef.current = true;
-        canvas.setPointerCapture?.(event.pointerId);
-        setFireInteractionStep("pickup");
-        return;
-      }
-
-      if (step === "aim") {
-        const hit = getHit(event);
-        if (hit && (hit === nozzle || isInteraction(hit, "extinguisher"))) {
-          setFireInteractionStep("spray");
-          window.setTimeout(() => setFireInteractionStep("complete"), 1400);
-        }
-      }
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const dx = event.clientX - dragStartX;
-      const dy = event.clientY - dragStartY;
-
-      if (fireExtinguisherDragRef.current) {
-        const rect = canvas.getBoundingClientRect();
-        const distance = Math.max(camera.position.z - extinguisher.position.z, 0.1);
-        const worldHeight = 2 * distance * Math.tan((camera.fov * Math.PI) / 360);
-        const worldPerPixelY = worldHeight / Math.max(rect.height, 1);
-        const worldPerPixelX = (worldHeight * camera.aspect) / Math.max(rect.width, 1);
-
-        extinguisher.position.x = THREE.MathUtils.clamp(
-          extinguisherStartX + dx * worldPerPixelX,
-          -2.2,
-          2.2
-        );
-        extinguisher.position.y = THREE.MathUtils.clamp(
-          extinguisherStartY - dy * worldPerPixelY,
-          -2.0,
-          1.6
-        );
-        return;
-      }
-
-      if (!firePinDragRef.current) return;
-
-      const distance = Math.hypot(dx, dy);
-
-      // Visually pull the pin outward while the worker drags it.
-      const progress = Math.min(distance / 55, 1);
-      pin.position.x = -0.22 - progress * 0.55;
-      pinHit.position.x = pin.position.x;
-
-      if (distance > 45) {
-        firePinDragRef.current = false;
-        pin.visible = false;
-        pinHit.visible = false;
-        canvas.releasePointerCapture?.(event.pointerId);
-        setFireInteractionStep("aim");
-      }
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      if (fireExtinguisherDragRef.current) {
-        const distance = Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY);
-        fireExtinguisherDragRef.current = false;
-        canvas.releasePointerCapture?.(event.pointerId);
-
-        // A tap or a completed drag both count as picking up the extinguisher.
-        if (distance >= 10) {
-          setFireInteractionStep("pin");
-        } else {
-          setFireInteractionStep("pin");
-        }
-        return;
-      }
-
-      if (!firePinDragRef.current) return;
-
-      const distance = Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY);
-      firePinDragRef.current = false;
-      canvas.releasePointerCapture?.(event.pointerId);
-
-      if (distance > 25) {
-        pin.visible = false;
-        pinHit.visible = false;
-        setFireInteractionStep("aim");
-      } else {
-        pin.position.copy(pinHit.position);
-        pin.position.x = -0.22;
-        pinHit.position.x = -0.22;
-      }
-    };
-
-    canvas.addEventListener("pointerdown", handlePointerDown, { passive: false });
-    canvas.addEventListener("pointermove", handlePointerMove, { passive: false });
-    canvas.addEventListener("pointerup", handlePointerUp, { passive: false });
-
-    resize();
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(container);
-
-    let animationFrame = 0;
-    const animate = (time: number) => {
-      extinguisher.position.y = -0.9 + Math.sin(time * 0.0015) * 0.01;
-      extinguisher.rotation.z = Math.sin(time * 0.0012) * 0.018;
-      renderer.render(scene, camera);
-      animationFrame = requestAnimationFrame(animate);
-    };
-    animationFrame = requestAnimationFrame(animate);
-
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      resizeObserver.disconnect();
-      canvas.removeEventListener("pointerdown", handlePointerDown);
-      canvas.removeEventListener("pointermove", handlePointerMove);
-      canvas.removeEventListener("pointerup", handlePointerUp);
-      renderer.dispose();
-      red.dispose();
-      dark.dispose();
-      metal.dispose();
-      yellow.dispose();
-      scene.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
-          else object.material.dispose();
-        }
-      });
-    };
-  }, [screen, activeModuleId, scenarioIndex]);
 
   const currentModule = moduleData[activeModuleId];
   const currentScenario = currentModule.scenarios[scenarioIndex] ?? currentModule.scenarios[0];
@@ -765,9 +498,6 @@ export default function Page() {
     setScenarioIndex(0);
     setAnswers([]);
     setResultSummary(null);
-    setFireInteractionStep(moduleId === "fire" ? "search" : "search");
-    firePinDragRef.current = false;
-    fireExtinguisherDragRef.current = false;
     setScreen("briefing");
     speak(moduleData[moduleId].briefing);
   };
@@ -1155,73 +885,44 @@ export default function Page() {
                 <div
                   ref={nativeCameraBoxRef}
                   className="scene-box camera-scene-box"
-                  style={{ background: "transparent", position: "relative", overflow: "hidden" }}
+                  style={{ background: "transparent", position: "relative" }}
                 >
-                  {activeModuleId === "fire" && (
-                    <canvas
-                      ref={threeCanvasRef}
-                      aria-label="3D fire extinguisher AR object"
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        display: "block",
-                        zIndex: 20,
-                        pointerEvents: "auto",
-                        touchAction: "none",
-                      }}
-                    />
-                  )}
-                </div>
-                {activeModuleId === "fire" && (
                   <div
                     style={{
                       position: "absolute",
-                      left: 14,
-                      right: 14,
-                      bottom: 14,
-                      zIndex: 30,
+                      top: 12,
+                      left: 12,
+                      zIndex: 20,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      padding: "10px 12px",
-                      borderRadius: 14,
-                      background: "rgba(7,12,18,.88)",
-                      border: "1px solid rgba(255,255,255,.14)",
-                      color: "white",
+                      gap: 8,
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      background: "rgba(7, 18, 14, 0.82)",
+                      color: "#ffffff",
+                      fontSize: 12,
+                      fontWeight: 700,
                       pointerEvents: "none",
                     }}
                   >
-                    <div>
-                      <strong style={{ display: "block", fontSize: 13 }}>
-                        {fireInteractionStep === "search" && "Find the extinguisher"}
-                        {fireInteractionStep === "pickup" && "Drag the extinguisher into position, then release"}
-                        {fireInteractionStep === "pin" && "Drag the yellow safety pin outward"}
-                        {fireInteractionStep === "aim" && "Aim the nozzle at the fire"}
-                        {fireInteractionStep === "spray" && "Squeeze — spraying agent"}
-                        {fireInteractionStep === "complete" && "Fire response completed"}
-                      </strong>
-                      <span style={{ display: "block", marginTop: 3, fontSize: 11, opacity: .72 }}>
-                        {fireInteractionStep === "search" ? "Custom object detection will trigger this stage." : "Interactive training state"}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: fireInteractionStep === "complete" ? "#4ade80" : "#fbbf24" }}>
-                      {fireInteractionStep === "complete" ? "DONE" : fireInteractionStep.toUpperCase()}
-                    </span>
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: detectedObjects.length > 0 ? "#22c55e" : "#facc15",
+                        boxShadow:
+                          detectedObjects.length > 0
+                            ? "0 0 10px rgba(34,197,94,0.8)"
+                            : "0 0 10px rgba(250,204,21,0.8)",
+                      }}
+                    />
+                    {detectedObjects.length > 0
+                      ? `${detectedObjects.length} object${detectedObjects.length > 1 ? "s" : ""} detected`
+                      : "AI scanning surroundings"}
                   </div>
-                )}
+                </div>
                 <p className="scene-copy">{currentScenario.context}</p>
-                {activeModuleId === "fire" && fireInteractionStep === "search" && (
-                  <button
-                    type="button"
-                    onClick={() => setFireInteractionStep("pickup")}
-                    style={{ marginTop: 10, width: "100%", padding: "11px 14px", borderRadius: 12, border: "1px solid rgba(249,115,22,.35)", background: "rgba(249,115,22,.12)", color: "inherit", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    Detect extinguisher → enable interaction
-                  </button>
-                )}
               </div>
 
               <div className="decision-panel">
