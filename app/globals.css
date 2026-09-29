@@ -2323,12 +2323,11 @@ body {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  background: linear-gradient(170deg, #0d2924 0%, #0a1f1e 45%, #0d211b 100%);
-  border-radius: 12px;
-  transition: background 0.5s ease;
+  color: white;
+  pointer-events: none;
 }
 .loto-procedure-overlay-complete {
-  background: linear-gradient(170deg, #052e23 0%, #04261f 45%, #052e1a 100%);
+  /* no-op: state tracked via child element classes */
 }
 
 .loto-procedure-header {
@@ -2350,8 +2349,9 @@ body {
 }
 .loto-energy-status {
   flex: 1;
-  background: rgba(20, 184, 166, 0.12);
-  border: 1px solid rgba(20, 184, 166, 0.25);
+  background: rgba(0, 40, 30, 0.75);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  backdrop-filter: blur(4px);
 }
 .loto-energy-status > span { display: flex; flex-direction: column; }
 .loto-energy-status strong { color: #5eead4; letter-spacing: 0.04em; }
@@ -2380,8 +2380,9 @@ body {
 }
 
 .loto-isolation-readout {
-  background: rgba(20, 184, 166, 0.08);
-  border: 1px solid rgba(20, 184, 166, 0.18);
+  background: rgba(0, 30, 25, 0.75);
+  border: 1px solid rgba(20, 184, 166, 0.28);
+  backdrop-filter: blur(4px);
   flex-direction: column;
   text-align: center;
   min-width: 56px;
@@ -2406,10 +2407,11 @@ body {
   justify-content: center;
   gap: 8px;
   position: relative;
-  background: rgba(20, 184, 166, 0.04);
-  border: 1px dashed rgba(20, 184, 166, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed rgba(20, 184, 166, 0.25);
   border-radius: 10px;
   padding: 12px;
+  pointer-events: none;
 }
 
 .loto-machine-visual {
@@ -2490,6 +2492,7 @@ body {
   display: flex;
   gap: 6px;
   width: 100%;
+  pointer-events: auto;
 }
 .loto-verify-control,
 .loto-trystart-control {
@@ -2500,8 +2503,9 @@ body {
   gap: 6px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(20, 184, 166, 0.2);
-  background: rgba(20, 184, 166, 0.06);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  background: rgba(0, 25, 20, 0.75);
+  backdrop-filter: blur(4px);
   color: rgba(153, 246, 228, 0.4);
   font-size: 0.58rem;
   font-weight: 700;
@@ -2543,6 +2547,7 @@ body {
 .loto-equipment-row {
   display: flex;
   gap: 6px;
+  pointer-events: auto;
 }
 .loto-equipment-item {
   flex: 1;
@@ -2552,8 +2557,9 @@ body {
   gap: 3px;
   padding: 8px 6px;
   border-radius: 8px;
-  border: 1px solid rgba(20, 184, 166, 0.18);
-  background: rgba(20, 184, 166, 0.06);
+  border: 1px solid rgba(20, 184, 166, 0.22);
+  background: rgba(0, 25, 20, 0.75);
+  backdrop-filter: blur(4px);
   font-size: 0.6rem;
   color: rgba(153, 246, 228, 0.5);
   transition: all 0.3s ease;
