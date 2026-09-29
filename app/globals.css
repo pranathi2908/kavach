@@ -1449,3 +1449,863 @@ body {
   background: transparent !important;
   border-color: rgba(255,255,255,0.16) !important;
 }
+
+.fire-completion {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding: 24px 0 32px;
+}
+
+.fire-completion-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.fire-completion-title {
+  max-width: 700px;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: 0;
+  font-weight: 800;
+}
+
+.fire-completion-status {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.fire-completion-header .pill {
+  flex: 0 0 auto;
+}
+
+.fire-completion-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.fire-completion-metric {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(10, 16, 21, 0.8);
+}
+
+.fire-completion-metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fire-completion-metric strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 18px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.fire-safety-takeaway {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--green);
+  background: rgba(10, 16, 21, 0.72);
+}
+
+.fire-safety-takeaway p:last-child {
+  margin-top: 6px;
+  line-height: 1.6;
+}
+
+.fire-completion-actions {
+  margin-top: 22px;
+  gap: 12px;
+}
+
+.fire-training-status {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(7, 12, 18, 0.92);
+  color: white;
+  pointer-events: none;
+}
+
+.fire-training-status-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+}
+
+.fire-training-instruction {
+  display: block;
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.fire-training-detail {
+  display: block;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fire-training-stage {
+  flex: 0 0 auto;
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.fire-training-stage-complete {
+  color: #4ade80;
+}
+
+.fire-spray-control {
+  min-width: 112px;
+  min-height: 48px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  color: white;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fire-spray-control-ready {
+  background: #15803d;
+  cursor: pointer;
+}
+
+.fire-spray-control-active {
+  background: #b91c1c;
+  cursor: pointer;
+}
+
+.fire-spray-control-disabled {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fire-spray-control:focus-visible,
+.fire-detect-control:focus-visible,
+.fire-completion-actions button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.fire-detect-control {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.12);
+  color: inherit;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.fire-performance-summary {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(5, 10, 15, 0.78);
+}
+
+.fire-performance-heading {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.fire-performance-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fire-performance-item {
+  min-width: 0;
+}
+
+.fire-performance-item span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.fire-performance-item strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .fire-completion {
+    padding: 12px 0 20px;
+  }
+
+  .fire-completion-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .fire-completion-title {
+    font-size: 24px;
+  }
+
+  .fire-completion-metrics {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .fire-completion-metric {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+  }
+
+  .fire-completion-metric span {
+    max-width: 60%;
+  }
+
+  .fire-completion-metric strong {
+    margin-top: 0;
+    text-align: right;
+  }
+
+  .fire-safety-takeaway {
+    margin-top: 18px;
+    padding: 12px 14px;
+  }
+
+  .fire-completion-actions {
+    margin-top: 18px;
+  }
+
+  .fire-training-status {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    gap: 8px;
+    padding: 10px;
+    align-items: flex-start;
+  }
+
+  .fire-training-instruction {
+    font-size: 13px;
+  }
+
+  .fire-training-detail {
+    font-size: 11px;
+  }
+
+  .fire-training-stage {
+    align-self: center;
+  }
+
+  .fire-spray-control {
+    min-width: 104px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .fire-performance-summary {
+    padding: 12px;
+  }
+
+  .fire-performance-metrics {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .fire-performance-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .fire-performance-item strong {
+    margin-top: 0;
+    text-align: right;
+  }
+}
+
+.gas-incident-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  color: white;
+  pointer-events: none;
+}
+
+.gas-incident-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gas-alarm-status,
+.gas-detector-readout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(5, 10, 15, 0.86);
+}
+
+.gas-alarm-indicator {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #fb615b;
+  box-shadow: 0 0 0 4px rgba(251, 97, 91, 0.14);
+}
+
+.gas-alarm-indicator-stopped {
+  background: #2dd4a5;
+  box-shadow: 0 0 0 4px rgba(45, 212, 165, 0.14);
+}
+
+.gas-alarm-status-complete {
+  border-color: rgba(45, 212, 165, 0.34);
+}
+
+.gas-alarm-status strong,
+.gas-detector-readout strong {
+  display: block;
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+}
+
+.gas-alarm-status small,
+.gas-detector-readout small {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.gas-detector-readout {
+  color: #fca5a5;
+}
+
+.gas-detector-readout-cleared {
+  border-color: rgba(45, 212, 165, 0.34);
+  color: #86efac;
+}
+
+.gas-site-plot {
+  position: relative;
+  flex: 1;
+  min-height: 145px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, transparent 49.7%, rgba(255, 255, 255, 0.08) 50%, transparent 50.3%),
+    linear-gradient(rgba(6, 14, 19, 0.18), rgba(6, 14, 19, 0.54));
+}
+
+.gas-site-plot::before {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: "";
+}
+
+.gas-tank-marker {
+  position: absolute;
+  top: 50%;
+  left: 8%;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  transform: translateY(-50%);
+}
+
+.gas-tank-object {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 78px;
+  border: 1px solid rgba(211, 222, 226, 0.78);
+  border-radius: 13px 13px 9px 9px;
+  background: linear-gradient(90deg, rgba(80, 101, 111, 0.9), rgba(25, 44, 53, 0.96) 48%, rgba(90, 108, 116, 0.9));
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.36);
+}
+
+.gas-tank-object::before {
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  width: 14px;
+  height: 8px;
+  border: 1px solid rgba(211, 222, 226, 0.78);
+  border-bottom: 0;
+  content: "";
+}
+
+.gas-site-label {
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(5, 10, 15, 0.88);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 9px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.gas-leak-plume {
+  position: absolute;
+  top: 25%;
+  left: 26%;
+  width: min(44%, 170px);
+  height: 44%;
+  border: 1px dashed rgba(251, 97, 91, 0.56);
+  border-radius: 48%;
+  background: radial-gradient(ellipse, rgba(239, 68, 68, 0.36), rgba(239, 68, 68, 0.16) 56%, transparent 76%);
+}
+
+.gas-leak-plume i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff8179;
+  box-shadow: 0 0 12px rgba(255, 97, 91, 0.86);
+}
+
+.gas-leak-plume i:nth-child(1) { top: 28%; left: 24%; }
+.gas-leak-plume i:nth-child(2) { top: 56%; left: 52%; }
+.gas-leak-plume i:nth-child(3) { top: 25%; right: 18%; }
+
+.gas-leak-label {
+  position: absolute;
+  top: 44%;
+  left: 30%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid rgba(251, 97, 91, 0.48);
+  border-radius: 7px;
+  background: rgba(78, 18, 23, 0.94);
+  color: #ffe4e2;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+.gas-leak-label-stopped {
+  border-color: rgba(45, 212, 165, 0.5);
+  background: rgba(5, 46, 37, 0.94);
+  color: #d1fae5;
+}
+
+.gas-upwind-route {
+  position: absolute;
+  right: 4%;
+  bottom: 4%;
+  left: 42%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 52px;
+  padding: 6px 9px;
+  border: 1px solid rgba(45, 212, 165, 0.46);
+  border-top: 2px dashed rgba(45, 212, 165, 0.86);
+  border-radius: 8px;
+  background: rgba(5, 29, 25, 0.92);
+  color: #a7f3d0;
+}
+
+.gas-upwind-route span {
+  min-width: 0;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.gas-upwind-route svg {
+  flex: 0 0 auto;
+}
+
+.gas-route-control {
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+}
+
+.gas-route-control-ready {
+  cursor: pointer;
+}
+
+.gas-route-control-ready:active {
+  background: rgba(8, 52, 42, 0.98);
+}
+
+.gas-route-control-awaiting {
+  opacity: 0.68;
+  cursor: pointer;
+}
+
+.gas-route-control-complete {
+  border-color: rgba(45, 212, 165, 0.6);
+  background: rgba(8, 52, 42, 0.96);
+  color: #d1fae5;
+}
+
+.gas-route-control:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.gas-response-equipment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gas-equipment-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 7px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background: rgba(5, 10, 15, 0.86);
+}
+
+.gas-equipment-item svg {
+  grid-row: span 2;
+  color: #a7f3d0;
+}
+
+.gas-equipment-item span {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.gas-equipment-item strong {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.gas-equipment-control {
+  width: 100%;
+  min-height: 58px;
+  color: white;
+  text-align: left;
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gas-equipment-control-ready {
+  border-color: rgba(45, 212, 165, 0.42);
+  background: rgba(15, 67, 55, 0.9);
+  cursor: pointer;
+}
+
+.gas-equipment-control-ready:active {
+  background: rgba(20, 91, 72, 0.96);
+}
+
+.gas-equipment-control-complete {
+  border-color: rgba(45, 212, 165, 0.3);
+  background: rgba(12, 44, 39, 0.9);
+}
+
+.gas-equipment-control-awaiting {
+  opacity: 0.58;
+  cursor: pointer;
+}
+
+.gas-equipment-control:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.gas-interaction-task {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(45, 212, 165, 0.24);
+  border-radius: 10px;
+  background: rgba(5, 10, 15, 0.82);
+}
+
+.gas-interaction-task > span {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.1em;
+}
+
+.gas-interaction-task strong {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.gas-interaction-task p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.gas-action-feedback {
+  font-weight: 700;
+}
+
+.gas-action-feedback-correct {
+  color: #86efac !important;
+}
+
+.gas-action-feedback-incorrect {
+  color: #fca5a5 !important;
+}
+
+.gas-interaction-task .gas-next-action {
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.gas-next-action strong {
+  color: white;
+  font-size: 11px;
+}
+
+.gas-performance-results {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.gas-performance-results > strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.gas-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.gas-performance-grid > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gas-performance-grid span {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.gas-performance-grid b {
+  color: white;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.gas-retry-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(45, 212, 165, 0.34);
+  border-radius: 9px;
+  background: rgba(15, 67, 55, 0.9);
+  color: white;
+  font-size: 12px;
+  font-weight: 750;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gas-retry-button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.gas-scenario-grid .choice-button {
+  min-height: 60px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 560px) {
+  .gas-incident-overlay {
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .gas-alarm-status,
+  .gas-detector-readout {
+    min-height: 42px;
+    padding: 6px 8px;
+  }
+
+  .gas-alarm-status strong,
+  .gas-detector-readout strong {
+    font-size: 9px;
+  }
+
+  .gas-alarm-status small,
+  .gas-detector-readout small {
+    font-size: 9px;
+  }
+
+  .gas-site-plot {
+    min-height: 138px;
+  }
+
+  .gas-tank-marker {
+    left: 6%;
+  }
+
+  .gas-tank-object {
+    width: 34px;
+    height: 70px;
+  }
+
+  .gas-tank-object::before {
+    left: 10px;
+  }
+
+  .gas-site-label {
+    font-size: 8px;
+  }
+
+  .gas-leak-plume {
+    left: 22%;
+    width: 46%;
+  }
+
+  .gas-leak-label {
+    left: 27%;
+    gap: 4px;
+    padding: 5px 6px;
+    font-size: 8px;
+  }
+
+  .gas-upwind-route {
+    right: 4%;
+    bottom: 4%;
+    left: 39%;
+    min-height: 52px;
+    padding: 6px 7px;
+  }
+
+  .gas-response-equipment {
+    gap: 6px;
+  }
+
+  .gas-equipment-item {
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: 3px 5px;
+    padding: 7px;
+  }
+
+  .gas-equipment-item span {
+    font-size: 9px;
+  }
+
+  .gas-equipment-item strong {
+    font-size: 8px;
+  }
+
+  .gas-equipment-control {
+    min-height: 64px;
+  }
+
+  .gas-interaction-task {
+    margin-top: 10px;
+    padding: 10px 12px;
+  }
+
+  .gas-scenario-grid .choice-button {
+    min-height: 64px;
+    padding: 13px 14px;
+    line-height: 1.4;
+  }
+}

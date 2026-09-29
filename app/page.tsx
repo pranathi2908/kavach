@@ -54,6 +54,31 @@ type Screen =
 type ModuleId = "fire" | "gas";
 type CompetencyKey = "hazard" | "response" | "route" | "safety";
 type FireInteractionStep = "search" | "pickup" | "pin" | "aim" | "spray" | "complete";
+type GasInteractionStep = "detect" | "ppe" | "evacuate" | "complete";
+type GasInteractionAction = Exclude<GasInteractionStep, "complete">;
+type GasInteractionFeedback = { status: "correct" | "incorrect"; message: string };
+type GasTrainingPerformance = {
+  completionTimeSeconds: number;
+  incorrectActions: number;
+  successfulCompletion: boolean;
+};
+type FireTrainingPerformance = {
+  completionTimeSeconds: number;
+  incorrectActions: number;
+  extinguished: boolean;
+};
+
+const formatFireCompletionTime = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+};
+
+const formatGasCompletionTime = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+};
 
 type WorkerProfile = {
   name: string;
@@ -310,14 +335,65 @@ export default function Page() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [onlineStatus, setOnlineStatus] = useState(true);
   const [fireInteractionStep, setFireInteractionStep] = useState<FireInteractionStep>("search");
+  const [fireAimValid, setFireAimValid] = useState(false);
+  const [firePerformance, setFirePerformance] = useState<FireTrainingPerformance | null>(null);
+  const [fireCompletionContinued, setFireCompletionContinued] = useState(false);
+  const [fireTrainingRunId, setFireTrainingRunId] = useState(0);
+  const [gasInteractionStep, setGasInteractionStep] = useState<GasInteractionStep>("detect");
+  const [gasInteractionFeedback, setGasInteractionFeedback] = useState<GasInteractionFeedback | null>(null);
+  const [gasPerformance, setGasPerformance] = useState<GasTrainingPerformance | null>(null);
   const [firePinDrag, setFirePinDrag] = useState(false);
   const fireInteractionStepRef = useRef<FireInteractionStep>("search");
+  const fireAimValidRef = useRef(false);
+  const fireExerciseStartedAtRef = useRef<number | null>(null);
+  const fireIncorrectActionsRef = useRef(0);
+  const gasExerciseStartedAtRef = useRef<number | null>(null);
+  const gasIncorrectActionsRef = useRef(0);
   const firePinDragRef = useRef(false);
+  const startFireSprayRef = useRef<(() => boolean) | null>(null);
+  const stopFireSprayRef = useRef<(() => void) | null>(null);
   const cameraRef = useRef<HTMLVideoElement | null>(null);
   const nativeCameraBoxRef = useRef<HTMLDivElement | null>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const certificateRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const recordFireIncorrectAction = () => {
+    fireIncorrectActionsRef.current += 1;
+  };
+
+  const handleGasAction = (action: GasInteractionAction) => {
+    if (gasInteractionStep === "complete") return;
+
+    if (action !== gasInteractionStep) {
+      gasIncorrectActionsRef.current += 1;
+      const message = gasInteractionStep === "detect"
+        ? "Incorrect. Acknowledge the methane alarm first."
+        : gasInteractionStep === "ppe"
+          ? action === "detect" ? "Incorrect. The leak is identified. Confirm the respirator next." : "Incorrect. Confirm the respirator before evacuation."
+          : "Incorrect. The leak and PPE are confirmed. Evacuate upwind next.";
+      setGasInteractionFeedback({ status: "incorrect", message });
+      return;
+    }
+
+    const nextStep: GasInteractionStep = action === "detect" ? "ppe" : action === "ppe" ? "evacuate" : "complete";
+    const message = action === "detect"
+      ? "Correct. Methane alarm acknowledged."
+      : action === "ppe"
+        ? "Correct. Respirator confirmed."
+        : "Correct. The gas hazard is isolated and the crew is at muster.";
+    if (action === "evacuate") {
+      const completedAt = performance.now();
+      const startedAt = gasExerciseStartedAtRef.current ?? completedAt;
+      setGasPerformance({
+        completionTimeSeconds: Math.floor(Math.max(0, completedAt - startedAt) / 1000),
+        incorrectActions: gasIncorrectActionsRef.current,
+        successfulCompletion: true,
+      });
+    }
+    setGasInteractionStep(nextStep);
+    setGasInteractionFeedback({ status: "correct", message });
+  };
 
   useEffect(() => {
     fireInteractionStepRef.current = fireInteractionStep;
@@ -385,6 +461,7 @@ export default function Page() {
   useEffect(() => {
     if (screen !== "scenario" || activeModuleId !== "fire") return;
 
+    const fireAlreadyExtinguished = fireInteractionStepRef.current === "complete";
     const canvas = threeCanvasRef.current;
     const container = nativeCameraBoxRef.current;
     if (!canvas || !container) return;
@@ -493,11 +570,13 @@ export default function Page() {
     const fireLight = new THREE.PointLight(0xff6500, 3.5, 3);
     fireLight.position.set(0, 0, 0.4);
     fireGroup.add(fireLight);
+    fireGroup.visible = !fireAlreadyExtinguished;
     scene.add(fireGroup);
 
     const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0xffb000, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
     const reticle = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.48, 32), reticleMaterial);
     reticle.position.set(-0.9, 0.05, 0.45);
+    reticle.visible = !fireAlreadyExtinguished;
     scene.add(reticle);
 
     const sprayGroup = new THREE.Group();
@@ -528,7 +607,9 @@ export default function Page() {
     let draggingExtinguisher = false;
     let draggingPin = false;
     let sprayStartTime = 0;
-    let fireHealth = 1;
+    let sprayLastTime = 0;
+    let sprayActive = false;
+    let fireHealth = fireAlreadyExtinguished ? 0 : 1;
 
     const resize = () => {
       const width = Math.max(container.clientWidth, 1);
@@ -586,19 +667,41 @@ export default function Page() {
       const aligned = distance < 0.28;
       reticleMaterial.color.set(aligned ? 0x35e06f : 0xffb000);
       reticle.scale.setScalar(aligned ? 1.15 : 1);
+      if (fireAimValidRef.current !== aligned) {
+        fireAimValidRef.current = aligned;
+        setFireAimValid(aligned);
+      }
       return aligned;
     };
 
     const startSpray = () => {
-      if (fireInteractionStepRef.current !== "aim" || fireHealth <= 0) return;
+      if (sprayActive || fireInteractionStepRef.current !== "aim" || fireHealth <= 0 || !fireGroup.visible || !checkAim()) return false;
+      sprayActive = true;
       sprayStartTime = performance.now();
+      sprayLastTime = sprayStartTime;
       sprayGroup.visible = true;
       sprayParticles.forEach((particle) => { particle.visible = true; });
       setFireInteractionStep("spray");
+      return true;
     };
 
+    const stopSpray = () => {
+      if (!sprayActive) return;
+      sprayActive = false;
+      sprayGroup.visible = false;
+      sprayParticles.forEach((particle) => { particle.visible = false; });
+      if (fireHealth > 0 && fireGroup.visible) setFireInteractionStep("aim");
+    };
+
+    startFireSprayRef.current = startSpray;
+    stopFireSprayRef.current = stopSpray;
+
     const updateSpray = (time: number) => {
-      if (!sprayGroup.visible) return;
+      if (!sprayActive || !sprayGroup.visible) return;
+      if (!checkAim()) {
+        stopSpray();
+        return;
+      }
 
       nozzle.getWorldPosition(nozzleWorld);
       fireGroup.getWorldPosition(fireWorld);
@@ -612,21 +715,29 @@ export default function Page() {
         particle.position.y += Math.cos(time * 0.008 + index) * 0.045 * progress;
       });
 
-      const elapsed = time - sprayStartTime;
-      if (elapsed > 250) {
-        fireHealth = Math.max(0, 1 - (elapsed - 250) / 1500);
-        fireGroup.scale.setScalar(Math.max(fireHealth, 0));
-        fireOuterMaterial.opacity = fireHealth * 0.96;
-        fireInnerMaterial.opacity = fireHealth;
-        fireCoreMaterial.opacity = fireHealth;
-        fireLight.intensity = fireHealth * 3.5;
-      }
+      const frameDelta = Math.min(Math.max(time - sprayLastTime, 0), 50);
+      sprayLastTime = time;
+      fireHealth = Math.max(0, fireHealth - frameDelta / 1800);
+      fireGroup.scale.setScalar(fireHealth);
+      fireOuterMaterial.opacity = fireHealth * 0.96;
+      fireInnerMaterial.opacity = fireHealth;
+      fireCoreMaterial.opacity = fireHealth;
+      fireLight.intensity = fireHealth * 3.5;
 
       if (fireHealth <= 0) {
+        sprayActive = false;
         sprayGroup.visible = false;
         fireGroup.visible = false;
         reticle.visible = false;
         sprayParticles.forEach((particle) => { particle.visible = false; });
+        const completedAt = performance.now();
+        const startedAt = fireExerciseStartedAtRef.current ?? completedAt;
+        setFirePerformance({
+          completionTimeSeconds: Math.floor(Math.max(0, completedAt - startedAt) / 1000),
+          incorrectActions: fireIncorrectActionsRef.current,
+          extinguished: true,
+        });
+        setFireCompletionContinued(false);
         setFireInteractionStep("complete");
       }
     };
@@ -647,6 +758,8 @@ export default function Page() {
           lastPointerY = event.clientY;
           canvas.setPointerCapture?.(event.pointerId);
           setFireInteractionStep("pickup");
+        } else {
+          recordFireIncorrectAction();
         }
         return;
       }
@@ -660,6 +773,8 @@ export default function Page() {
           lastPointerX = event.clientX;
           lastPointerY = event.clientY;
           canvas.setPointerCapture?.(event.pointerId);
+        } else {
+          recordFireIncorrectAction();
         }
         return;
       }
@@ -671,6 +786,8 @@ export default function Page() {
           lastPointerX = event.clientX;
           lastPointerY = event.clientY;
           canvas.setPointerCapture?.(event.pointerId);
+        } else {
+          recordFireIncorrectAction();
         }
       }
     };
@@ -690,10 +807,11 @@ export default function Page() {
         pin.position.y = 0.9 - THREE.MathUtils.clamp((event.clientY - dragStartY) / 100, -0.5, 0.5);
         if (distance > 32) {
           pin.visible = false;
-          draggingPin = false;
           firePinDragRef.current = false;
           setFirePinDrag(false);
           setFireInteractionStep("aim");
+        } else {
+          recordFireIncorrectAction();
         }
         return;
       }
@@ -739,9 +857,7 @@ export default function Page() {
           return;
         }
 
-        if (step === "aim" && checkAim()) {
-          startSpray();
-        }
+        if (step === "aim" && !checkAim()) recordFireIncorrectAction();
       }
     };
 
@@ -781,6 +897,8 @@ export default function Page() {
     return () => {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
+      startFireSprayRef.current = null;
+      stopFireSprayRef.current = null;
       canvas.removeEventListener("pointerdown", handlePointerDown);
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
@@ -800,7 +918,7 @@ export default function Page() {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });
     };
-  }, [screen, activeModuleId, scenarioIndex]);
+  }, [screen, activeModuleId, scenarioIndex, fireTrainingRunId]);
 
   const currentModule = moduleData[activeModuleId];
   const currentScenario = currentModule.scenarios[scenarioIndex] ?? currentModule.scenarios[0];
@@ -887,13 +1005,58 @@ export default function Page() {
 
   const startModule = (moduleId: ModuleId) => {
     setActiveModuleId(moduleId);
+    if (moduleId === "gas") {
+      setGasInteractionStep("detect");
+      setGasInteractionFeedback(null);
+      setGasPerformance(null);
+      gasExerciseStartedAtRef.current = null;
+      gasIncorrectActionsRef.current = 0;
+    }
     setScenarioIndex(0);
     setAnswers([]);
     setResultSummary(null);
+    setFirePerformance(null);
+    setFireCompletionContinued(false);
+    fireExerciseStartedAtRef.current = null;
+    fireIncorrectActionsRef.current = 0;
+    fireAimValidRef.current = false;
+    setFireAimValid(false);
     setFireInteractionStep(moduleId === "fire" ? "search" : "search");
     setFirePinDrag(false);
     setScreen("briefing");
     speak(moduleData[moduleId].briefing);
+  };
+
+  const retryFireTraining = () => {
+    setActiveModuleId("fire");
+    setScenarioIndex(0);
+    setAnswers([]);
+    setResultSummary(null);
+    setFirePerformance(null);
+    setFireCompletionContinued(false);
+    fireExerciseStartedAtRef.current = performance.now();
+    fireIncorrectActionsRef.current = 0;
+    fireInteractionStepRef.current = "search";
+    setFireInteractionStep("search");
+    fireAimValidRef.current = false;
+    setFireAimValid(false);
+    firePinDragRef.current = false;
+    setFirePinDrag(false);
+    setFireTrainingRunId((runId) => runId + 1);
+    setScreen("scenario");
+  };
+
+  const retryGasTraining = () => {
+    setActiveModuleId("gas");
+    setScenarioIndex(0);
+    setAnswers([]);
+    setResultSummary(null);
+    setGasInteractionStep("detect");
+    setGasInteractionFeedback(null);
+    setGasPerformance(null);
+    gasExerciseStartedAtRef.current = performance.now();
+    gasIncorrectActionsRef.current = 0;
+    setScreen("scenario");
   };
 
   const handleChoice = (choice: Choice) => {
@@ -1252,7 +1415,20 @@ export default function Page() {
 
             <div className="button-row">
               <button className="secondary-button" onClick={() => setScreen("home")}>Back</button>
-              <button className="primary-button" onClick={() => { setScreen("scenario"); speak(`${currentModule.title} scenario started.`); }}>
+              <button className="primary-button" onClick={() => {
+                if (activeModuleId === "fire") {
+                  fireExerciseStartedAtRef.current = performance.now();
+                  fireIncorrectActionsRef.current = 0;
+                  setFirePerformance(null);
+                } else if (activeModuleId === "gas") {
+                  gasExerciseStartedAtRef.current = performance.now();
+                  gasIncorrectActionsRef.current = 0;
+                  setGasPerformance(null);
+                  setGasInteractionFeedback(null);
+                }
+                setScreen("scenario");
+                speak(`${currentModule.title} scenario started.`);
+              }}>
                 Enter scenario <ArrowRight size={18} />
               </button>
             </div>
@@ -1261,18 +1437,58 @@ export default function Page() {
 
         {screen === "scenario" && (
           <section className="panel scenario-panel">
-            <div className="screen-header compact-header">
-              <div>
-                <p className="eyebrow">Live assessment</p>
-                <h3>{currentModule.title}</h3>
-              </div>
-              <span className="pill pill-success">Step {scenarioIndex + 1}/{currentModule.scenarios.length}</span>
-            </div>
+            {activeModuleId === "fire" && fireInteractionStep === "complete" && firePerformance && !fireCompletionContinued ? (
+              <div className="fire-completion">
+                <p className="eyebrow eyebrow-success">Fire Safety Training</p>
+                <div className="fire-completion-header">
+                  <div>
+                    <h2 className="fire-completion-title">FIRE SAFETY TRAINING COMPLETE</h2>
+                    <p className="fire-completion-status">
+                      {firePerformance.extinguished ? "The fire was successfully extinguished." : "The fire was not extinguished."}
+                    </p>
+                  </div>
+                  <span className="pill pill-success">COMPLETE</span>
+                </div>
 
-            <div className="scenario-grid">
+                <div className="fire-completion-metrics">
+                  <div className="fire-completion-metric">
+                    <span>Completion status</span>
+                    <strong>{firePerformance.extinguished ? "Successful" : "Not extinguished"}</strong>
+                  </div>
+                  <div className="fire-completion-metric">
+                    <span>Completion time</span>
+                    <strong>{formatFireCompletionTime(firePerformance.completionTimeSeconds)}</strong>
+                  </div>
+                  <div className="fire-completion-metric">
+                    <span>Mistakes / incorrect actions</span>
+                    <strong>{firePerformance.incorrectActions}</strong>
+                  </div>
+                </div>
+
+                <div className="fire-safety-takeaway">
+                  <p className="eyebrow eyebrow-success">Safety takeaway</p>
+                  <p>Aim at the base of the fire, sweep side to side, and keep a clear exit route.</p>
+                </div>
+
+                <div className="button-row fire-completion-actions">
+                  <button className="secondary-button" onClick={retryFireTraining}>Retry Training</button>
+                  <button className="primary-button" onClick={() => setFireCompletionContinued(true)}>Continue to assessment</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="screen-header compact-header">
+                  <div>
+                    <p className="eyebrow">Live assessment</p>
+                    <h3>{currentModule.title}</h3>
+                  </div>
+                  <span className="pill pill-success">Step {scenarioIndex + 1}/{currentModule.scenarios.length}</span>
+                </div>
+
+                <div className={`scenario-grid${activeModuleId === "gas" ? " gas-scenario-grid" : ""}`}>
               <div className="scene-panel">
                 <div className="scene-header">
-                  <span>Analyzing surroundings</span>
+                  <span>{activeModuleId === "gas" ? `Gas incident · ${currentScenario.title}` : "Analyzing surroundings"}</span>
                   <MapPinned size={15} />
                 </div>
 
@@ -1297,51 +1513,162 @@ export default function Page() {
                       }}
                     />
                   )}
+                  {activeModuleId === "gas" && (
+                    <div className={`gas-incident-overlay${gasInteractionStep === "complete" ? " gas-incident-overlay-complete" : ""}`} aria-label="Gas incident at the tank farm">
+                      <div className="gas-incident-header">
+                        <div className={`gas-alarm-status${gasInteractionStep === "complete" ? " gas-alarm-status-complete" : ""}`}>
+                          <span className={`gas-alarm-indicator${gasInteractionStep === "complete" ? " gas-alarm-indicator-stopped" : ""}`} aria-hidden="true" />
+                          <span>
+                            <strong>{gasInteractionStep === "complete" ? "GAS HAZARD STOPPED" : gasInteractionStep === "evacuate" ? "PPE CONFIRMED" : gasInteractionStep === "ppe" ? "LEAK IDENTIFIED" : "GAS ALARM ACTIVE"}</strong>
+                            <small>{gasInteractionStep === "complete" ? "Scenario complete · crew at muster" : gasInteractionStep === "evacuate" ? "Move to the muster point" : "Methane · Tank farm"}</small>
+                          </span>
+                        </div>
+                        <div className={`gas-detector-readout${gasInteractionStep === "complete" ? " gas-detector-readout-cleared" : ""}`}>
+                          <Gauge size={20} aria-hidden="true" />
+                          <span><strong>DETECTOR</strong><small>{gasInteractionStep === "complete" ? "CLEARED" : "ALARM"}</small></span>
+                        </div>
+                      </div>
+
+                      <div className="gas-site-plot" aria-label="Tank access, leak plume, and upwind muster route">
+                        <div className="gas-tank-marker">
+                          <span className="gas-tank-object" aria-hidden="true" />
+                          <span className="gas-site-label">Tank access</span>
+                        </div>
+                        {gasInteractionStep !== "complete" && <div className="gas-leak-plume" aria-hidden="true"><i /><i /><i /></div>}
+                        <div className={`gas-leak-label${gasInteractionStep === "complete" ? " gas-leak-label-stopped" : ""}`}>
+                          {gasInteractionStep === "complete" ? <CheckCircle2 size={15} aria-hidden="true" /> : <AlertTriangle size={15} aria-hidden="true" />}
+                          <span>{gasInteractionStep === "complete" ? "SOURCE ISOLATED" : "METHANE LEAK"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={`gas-upwind-route gas-route-control${gasInteractionStep === "evacuate" ? " gas-route-control-ready" : gasInteractionStep === "complete" ? " gas-route-control-complete" : " gas-route-control-awaiting"}`}
+                          aria-label={gasInteractionStep === "evacuate" ? "Tap to evacuate upwind to the muster point" : gasInteractionStep === "complete" ? "Upwind evacuation complete" : "Complete gas detection and PPE steps before evacuation"}
+                          aria-pressed={gasInteractionStep === "complete"}
+                          disabled={gasInteractionStep !== "evacuate"}
+                          onClick={() => handleGasAction("evacuate")}
+                        >
+                          <MapPinned size={16} aria-hidden="true" />
+                          <span>{gasInteractionStep === "complete" ? "PERSONNEL SAFE" : gasInteractionStep === "evacuate" ? "TAP TO EVACUATE UPWIND" : "UPWIND MUSTER POINT"}</span>
+                          <ArrowRight size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+
+                      <div className="gas-response-equipment">
+                        <button
+                          type="button"
+                          className={`gas-equipment-item gas-equipment-control${gasInteractionStep === "detect" ? " gas-equipment-control-ready" : " gas-equipment-control-complete"}`}
+                          aria-label={gasInteractionStep === "detect" ? "Tap gas detector to identify the leak" : "Gas leak identified"}
+                          aria-pressed={gasInteractionStep !== "detect"}
+                          disabled={gasInteractionStep === "complete"}
+                          onClick={() => handleGasAction("detect")}
+                        >
+                          <Gauge size={17} aria-hidden="true" />
+                          <span>Gas detector</span>
+                          <strong>{gasInteractionStep === "detect" ? "Tap to identify" : "Leak identified"}</strong>
+                        </button>
+                        <button
+                          type="button"
+                          className={`gas-equipment-item gas-equipment-control${gasInteractionStep === "ppe" ? " gas-equipment-control-ready" : gasInteractionStep === "evacuate" || gasInteractionStep === "complete" ? " gas-equipment-control-complete" : " gas-equipment-control-awaiting"}`}
+                          aria-label={gasInteractionStep === "ppe" ? "Tap respirator to confirm required protective equipment" : gasInteractionStep === "evacuate" || gasInteractionStep === "complete" ? "Respirator confirmed" : "Identify the gas leak before selecting the respirator"}
+                          aria-pressed={gasInteractionStep === "evacuate" || gasInteractionStep === "complete"}
+                          disabled={gasInteractionStep === "complete"}
+                          onClick={() => handleGasAction("ppe")}
+                        >
+                          <ShieldCheck size={17} aria-hidden="true" />
+                          <span>Respirator</span>
+                          <strong>{gasInteractionStep === "ppe" ? "Tap to confirm PPE" : gasInteractionStep === "evacuate" || gasInteractionStep === "complete" ? "PPE confirmed" : "Required PPE"}</strong>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+                {activeModuleId === "gas" && (
+                  <div className="gas-interaction-task" role="status" aria-live="polite">
+                    <span>{gasInteractionStep === "detect" ? "REQUIRED ACTION · 1 OF 3" : gasInteractionStep === "ppe" ? "REQUIRED ACTION · 2 OF 3" : gasInteractionStep === "evacuate" ? "REQUIRED ACTION · 3 OF 3" : "SCENARIO COMPLETE"}</span>
+                    <strong>{gasInteractionStep === "detect" ? "Identify the gas leak" : gasInteractionStep === "ppe" ? "Confirm protective equipment" : gasInteractionStep === "evacuate" ? "Evacuate upwind" : "Gas hazard stopped"}</strong>
+                    {gasInteractionFeedback && <p className={`gas-action-feedback gas-action-feedback-${gasInteractionFeedback.status}`} aria-live="polite">{gasInteractionFeedback.message}</p>}
+                    <p className="gas-next-action"><strong>{gasInteractionStep === "complete" ? "Status:" : "Next:"}</strong> {gasInteractionStep === "detect" ? "Tap the gas detector." : gasInteractionStep === "ppe" ? "Tap the respirator." : gasInteractionStep === "evacuate" ? "Tap the upwind muster point." : "Crew safe at muster. Maintain isolation until all-clear."}</p>
+                    {gasInteractionStep === "complete" && gasPerformance && (
+                      <div className="gas-performance-results" aria-label="Gas training performance">
+                        <strong>Training performance</strong>
+                        <div className="gas-performance-grid">
+                          <div><span>Completion time</span><b>{formatGasCompletionTime(gasPerformance.completionTimeSeconds)}</b></div>
+                          <div><span>Incorrect actions</span><b>{gasPerformance.incorrectActions}</b></div>
+                          <div><span>Successful</span><b>{gasPerformance.successfulCompletion ? "Yes" : "No"}</b></div>
+                        </div>
+                        <button type="button" className="gas-retry-button" onClick={retryGasTraining}>Retry Training</button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {activeModuleId === "fire" && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: 14,
-                      right: 14,
-                      bottom: 14,
-                      zIndex: 30,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      padding: "10px 12px",
-                      borderRadius: 14,
-                      background: "rgba(7,12,18,.88)",
-                      border: "1px solid rgba(255,255,255,.14)",
-                      color: "white",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ display: "block", fontSize: 13 }}>
-                        {fireInteractionStep === "search" && "Find the extinguisher"}
-                        {fireInteractionStep === "pickup" && "Drag or tap the extinguisher to pick it up"}
-                        {fireInteractionStep === "pin" && "Drag the yellow safety pin outward"}
-                        {fireInteractionStep === "aim" && "Drag the extinguisher until the nozzle points at the fire"}
-                        {fireInteractionStep === "spray" && "Squeeze — spraying agent"}
-                        {fireInteractionStep === "complete" && "Fire response completed"}
+                  <div className="fire-training-status">
+                    <div className="fire-training-status-copy">
+                      <strong className="fire-training-instruction">
+                        {fireInteractionStep === "search" && "1. Locate the fire."}
+                        {fireInteractionStep === "pickup" && "2. Pick up the extinguisher."}
+                        {fireInteractionStep === "pin" && "3. Pull the safety pin."}
+                        {fireInteractionStep === "aim" && "4. Aim the nozzle at the base of the fire."}
+                        {fireInteractionStep === "spray" && "5. Press and hold to spray."}
+                        {fireInteractionStep === "complete" && "Fire extinguished"}
                       </strong>
-                      <span style={{ display: "block", marginTop: 3, fontSize: 11, opacity: .72 }}>
-                        {fireInteractionStep === "search" ? "Find and select the extinguisher to begin." : fireInteractionStep === "aim" ? "Release when the nozzle aligns with the fire." : "Interactive training state"}
+                      <span className="fire-training-detail">
+                        {fireInteractionStep === "search" ? "Identify the active fire in the scene." : fireInteractionStep === "pickup" ? "Select the extinguisher to continue." : fireInteractionStep === "pin" ? "Pull outward to release the pin." : fireInteractionStep === "aim" ? (fireAimValid ? "On target. Hold the spray control." : "Adjust until the nozzle points at the fire base.") : fireInteractionStep === "spray" ? "6. Sweep the spray across the fire until extinguished." : fireInteractionStep === "complete" ? "Fire hazard cleared. Response complete." : ""}
                       </span>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: fireInteractionStep === "complete" ? "#4ade80" : "#fbbf24" }}>
-                      {fireInteractionStep === "complete" ? "DONE" : fireInteractionStep.toUpperCase()}
-                    </span>
+                    {fireInteractionStep === "aim" || fireInteractionStep === "spray" ? (
+                      <button
+                        type="button"
+                        className={`fire-spray-control${fireInteractionStep === "spray" ? " fire-spray-control-active" : fireAimValid ? " fire-spray-control-ready" : " fire-spray-control-disabled"}`}
+                        aria-label={fireInteractionStep === "spray" ? "Release to stop spraying" : "Hold to spray"}
+                        disabled={fireInteractionStep === "aim" && !fireAimValid}
+                        onPointerDown={(event) => {
+                          if (event.button !== 0 || !startFireSprayRef.current?.()) return;
+                          event.preventDefault();
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                        }}
+                        onPointerUp={() => stopFireSprayRef.current?.()}
+                        onPointerCancel={() => stopFireSprayRef.current?.()}
+                        onLostPointerCapture={() => stopFireSprayRef.current?.()}
+                        onContextMenu={(event) => event.preventDefault()}
+                      >
+                        {fireInteractionStep === "spray" ? "Release to stop" : "Hold to spray"}
+                      </button>
+                    ) : (
+                      <span className={`fire-training-stage${fireInteractionStep === "complete" ? " fire-training-stage-complete" : ""}`}>
+                        {fireInteractionStep === "complete" ? "DONE" : fireInteractionStep.toUpperCase()}
+                      </span>
+                    )}
                   </div>
                 )}
                 <p className="scene-copy">{currentScenario.context}</p>
+                {activeModuleId === "fire" && fireInteractionStep === "complete" && firePerformance && (
+                  <section
+                    className="fire-performance-summary"
+                    aria-live="polite"
+                  >
+                    <strong className="fire-performance-heading">Training performance</strong>
+                    <div className="fire-performance-metrics">
+                      <div className="fire-performance-item">
+                        <span>Completion time</span>
+                        <strong>{formatFireCompletionTime(firePerformance.completionTimeSeconds)}</strong>
+                      </div>
+                      <div className="fire-performance-item">
+                        <span>Incorrect actions</span>
+                        <strong>{firePerformance.incorrectActions}</strong>
+                      </div>
+                      <div className="fire-performance-item">
+                        <span>Fire extinguished</span>
+                        <strong>{firePerformance.extinguished ? "Yes" : "No"}</strong>
+                      </div>
+                    </div>
+                  </section>
+                )}
                 {activeModuleId === "fire" && fireInteractionStep === "search" && (
                   <button
                     type="button"
+                    className="fire-detect-control"
                     onClick={() => setFireInteractionStep("pickup")}
-                    style={{ marginTop: 10, width: "100%", padding: "11px 14px", borderRadius: 12, border: "1px solid rgba(249,115,22,.35)", background: "rgba(249,115,22,.12)", color: "inherit", fontWeight: 800, cursor: "pointer" }}
                   >
                     Detect extinguisher → interact
                   </button>
@@ -1359,7 +1686,9 @@ export default function Page() {
                   ))}
                 </div>
               </div>
-            </div>
+                </div>
+              </>
+            )}
           </section>
         )}
 
