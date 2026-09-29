@@ -2309,3 +2309,429 @@ body {
     line-height: 1.4;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOTO MODULE – Machinery Safety & Lockout/Tagout
+   Accent: teal #14b8a6
+   ═══════════════════════════════════════════════════════════════════ */
+
+.loto-procedure-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: linear-gradient(170deg, #0d2924 0%, #0a1f1e 45%, #0d211b 100%);
+  border-radius: 12px;
+  transition: background 0.5s ease;
+}
+.loto-procedure-overlay-complete {
+  background: linear-gradient(170deg, #052e23 0%, #04261f 45%, #052e1a 100%);
+}
+
+.loto-procedure-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.loto-energy-status,
+.loto-isolation-readout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.loto-energy-status {
+  flex: 1;
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+}
+.loto-energy-status > span { display: flex; flex-direction: column; }
+.loto-energy-status strong { color: #5eead4; letter-spacing: 0.04em; }
+.loto-energy-status small { color: rgba(94, 234, 212, 0.6); margin-top: 1px; }
+.loto-energy-status-safe {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.loto-energy-status-safe strong { color: #6ee7b7; }
+.loto-energy-status-safe small { color: rgba(110, 231, 183, 0.6); }
+
+.loto-energy-indicator {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  animation: lotoEnergyPulse 1.2s ease-in-out infinite;
+}
+.loto-energy-indicator-off {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+  animation: none;
+}
+@keyframes lotoEnergyPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.loto-isolation-readout {
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  flex-direction: column;
+  text-align: center;
+  min-width: 56px;
+}
+.loto-isolation-readout svg { color: #5eead4; }
+.loto-isolation-readout span { display: flex; flex-direction: column; }
+.loto-isolation-readout strong { color: #99f6e4; font-size: 0.62rem; letter-spacing: 0.06em; }
+.loto-isolation-readout small { color: rgba(153, 246, 228, 0.55); font-size: 0.58rem; }
+.loto-isolation-readout-locked {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.loto-isolation-readout-locked svg { color: #6ee7b7; }
+.loto-isolation-readout-locked strong { color: #6ee7b7; }
+.loto-isolation-readout-locked small { color: rgba(110, 231, 183, 0.7); }
+
+.loto-machine-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  background: rgba(20, 184, 166, 0.04);
+  border: 1px dashed rgba(20, 184, 166, 0.15);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.loto-machine-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.loto-machine-object {
+  display: block;
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1a3a35 0%, #14302b 100%);
+  border: 2px solid rgba(20, 184, 166, 0.35);
+  box-shadow: 0 0 16px rgba(20, 184, 166, 0.15), inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+.loto-machine-object::before {
+  content: "⚙";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  opacity: 0.7;
+}
+.loto-site-label {
+  font-size: 0.62rem;
+  color: rgba(153, 246, 228, 0.5);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.loto-energy-hazard {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.loto-energy-hazard i {
+  display: block;
+  width: 6px;
+  height: 18px;
+  border-radius: 3px;
+  background: #f59e0b;
+  animation: lotoEnergyBolt 0.8s ease-in-out infinite;
+}
+.loto-energy-hazard i:nth-child(2) { animation-delay: 0.2s; height: 24px; }
+.loto-energy-hazard i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes lotoEnergyBolt {
+  0%, 100% { opacity: 1; transform: scaleY(1); }
+  50% { opacity: 0.4; transform: scaleY(0.6); }
+}
+
+.loto-hazard-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+.loto-hazard-label svg { flex-shrink: 0; }
+.loto-hazard-label-safe {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.loto-verification-controls {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+.loto-verify-control,
+.loto-trystart-control {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  background: rgba(20, 184, 166, 0.06);
+  color: rgba(153, 246, 228, 0.4);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: default;
+  transition: all 0.3s ease;
+}
+.loto-verify-control span,
+.loto-trystart-control span { white-space: nowrap; }
+
+.loto-verify-control-ready,
+.loto-trystart-control-ready {
+  background: rgba(20, 184, 166, 0.15);
+  border-color: rgba(20, 184, 166, 0.45);
+  color: #5eead4;
+  cursor: pointer;
+  animation: lotoControlPulse 2s ease-in-out infinite;
+}
+.loto-verify-control-ready:active,
+.loto-trystart-control-ready:active {
+  transform: scale(0.96);
+}
+.loto-verify-control-complete,
+.loto-trystart-control-complete {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+.loto-verify-control-awaiting,
+.loto-trystart-control-awaiting {
+  opacity: 0.4;
+}
+@keyframes lotoControlPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(20, 184, 166, 0.2); }
+}
+
+.loto-equipment-row {
+  display: flex;
+  gap: 6px;
+}
+.loto-equipment-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  background: rgba(20, 184, 166, 0.06);
+  font-size: 0.6rem;
+  color: rgba(153, 246, 228, 0.5);
+  transition: all 0.3s ease;
+  cursor: default;
+}
+.loto-equipment-item span { font-size: 0.58rem; }
+.loto-equipment-item strong { font-size: 0.54rem; letter-spacing: 0.04em; }
+.loto-equipment-item svg { flex-shrink: 0; }
+
+.loto-equipment-control-ready {
+  background: rgba(20, 184, 166, 0.14);
+  border-color: rgba(20, 184, 166, 0.4);
+  color: #5eead4;
+  cursor: pointer;
+  animation: lotoControlPulse 2s ease-in-out infinite;
+}
+.loto-equipment-control-ready:active { transform: scale(0.95); }
+.loto-equipment-control-ready strong { color: #5eead4; }
+
+.loto-equipment-control-complete {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+.loto-equipment-control-complete strong { color: #6ee7b7; }
+
+.loto-equipment-control-awaiting {
+  opacity: 0.35;
+}
+
+/* LOTO scenario grid */
+.loto-scenario-grid {
+  grid-template-columns: 1fr;
+}
+.loto-scenario-grid .scene-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* LOTO interaction task */
+.loto-interaction-task {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(20, 184, 166, 0.06);
+  border: 1px solid rgba(20, 184, 166, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.loto-interaction-task > span {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #14b8a6;
+  text-transform: uppercase;
+}
+.loto-interaction-task > strong {
+  font-size: 0.88rem;
+  color: #ccfbf1;
+}
+
+.loto-action-feedback {
+  margin: 4px 0 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.loto-action-feedback-correct {
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.loto-action-feedback-incorrect {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.loto-next-action {
+  font-size: 0.7rem;
+  color: rgba(204, 251, 241, 0.55);
+  margin-top: 2px;
+}
+.loto-next-action strong {
+  color: rgba(204, 251, 241, 0.75);
+}
+
+.loto-performance-results {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.loto-performance-results > strong {
+  font-size: 0.72rem;
+  color: #99f6e4;
+  letter-spacing: 0.04em;
+}
+.loto-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.loto-performance-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.loto-performance-grid span {
+  font-size: 0.6rem;
+  color: rgba(153, 246, 228, 0.5);
+}
+.loto-performance-grid b {
+  font-size: 0.82rem;
+  color: #ccfbf1;
+}
+
+.loto-retry-button {
+  align-self: flex-start;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 184, 166, 0.3);
+  background: rgba(20, 184, 166, 0.1);
+  color: #5eead4;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.loto-retry-button:hover {
+  background: rgba(20, 184, 166, 0.18);
+}
+
+/* LOTO mobile responsive */
+@media (max-width: 600px) {
+  .loto-procedure-overlay {
+    padding: 10px;
+    gap: 8px;
+  }
+  .loto-procedure-header {
+    gap: 6px;
+  }
+  .loto-energy-status,
+  .loto-isolation-readout {
+    padding: 5px 8px;
+    font-size: 0.65rem;
+  }
+  .loto-machine-object {
+    width: 44px;
+    height: 44px;
+  }
+  .loto-machine-object::before {
+    font-size: 22px;
+  }
+  .loto-equipment-item {
+    padding: 6px 4px;
+    font-size: 0.55rem;
+  }
+  .loto-verify-control,
+  .loto-trystart-control {
+    padding: 6px 8px;
+    font-size: 0.52rem;
+  }
+  .loto-interaction-task {
+    margin-top: 10px;
+    padding: 10px 12px;
+  }
+  .loto-scenario-grid .choice-button {
+    min-height: 64px;
+    padding: 13px 14px;
+    line-height: 1.4;
+  }
+}
+

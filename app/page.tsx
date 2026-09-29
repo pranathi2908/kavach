@@ -10,15 +10,19 @@ import {
   Download,
   Flame,
   Gauge,
+  Lock,
   MapPinned,
   Play,
   QrCode,
+  Settings,
   ShieldCheck,
   Sparkles,
+  Tag,
   Trophy,
   UserCog,
   Wifi,
   WifiOff,
+  Zap,
 } from "lucide-react";
 import { toPng } from "html-to-image";
 import QRCode from "qrcode";
@@ -51,7 +55,7 @@ type Screen =
   | "verification"
   | "syncLog"
   | "dashboard";
-type ModuleId = "fire" | "gas";
+type ModuleId = "fire" | "gas" | "loto";
 type CompetencyKey = "hazard" | "response" | "route" | "safety";
 type FireInteractionStep = "search" | "pickup" | "pin" | "aim" | "spray" | "complete";
 type GasInteractionStep = "detect" | "ppe" | "evacuate" | "complete";
@@ -67,6 +71,14 @@ type FireTrainingPerformance = {
   incorrectActions: number;
   extinguished: boolean;
 };
+type LotoInteractionStep = "identify" | "lockout" | "tagout" | "verify" | "trystart" | "complete";
+type LotoInteractionAction = Exclude<LotoInteractionStep, "complete">;
+type LotoInteractionFeedback = { status: "correct" | "incorrect"; message: string };
+type LotoTrainingPerformance = {
+  completionTimeSeconds: number;
+  incorrectActions: number;
+  successfulCompletion: boolean;
+};
 
 const formatFireCompletionTime = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60);
@@ -75,6 +87,12 @@ const formatFireCompletionTime = (totalSeconds: number) => {
 };
 
 const formatGasCompletionTime = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+};
+
+const formatLotoCompletionTime = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
@@ -110,7 +128,7 @@ type ModuleConfig = {
   briefing: string;
   location: string;
   accent: string;
-  icon: "fire" | "gas";
+  icon: "fire" | "gas" | "loto";
   scenarios: Scenario[];
 };
 
@@ -250,6 +268,58 @@ const moduleData: Record<ModuleId, ModuleConfig> = {
       },
     ],
   },
+  loto: {
+    title: "Machinery Safety & LOTO",
+    subtitle: "HSE Level 3",
+    description: "Identify energy sources, follow the lockout/tagout sequence, verify zero energy, and perform a try-start test before maintenance.",
+    briefing:
+      "A conveyor motor in the machinery hall requires maintenance. The worker must identify all energy sources, apply a personal lock and danger tag, verify zero energy, and perform a try-start test before beginning work.",
+    location: "Machinery hall",
+    accent: "#14b8a6",
+    icon: "loto",
+    scenarios: [
+      {
+        title: "Energy source identification",
+        prompt: "What energy sources must be isolated before starting work on the conveyor?",
+        context: "The conveyor motor is connected to electrical supply and hydraulic lines. A worker must identify all energy sources before applying lockout.",
+        choices: [
+          { id: "l-h1", label: "Electrical supply and hydraulic pressure connected to the motor", correct: true, points: 25, note: "Correct identification of all energy sources.", competency: "hazard" },
+          { id: "l-h2", label: "Only the electrical switch on the wall", correct: false, points: 0, note: "Hydraulic energy is also present and must be identified.", competency: "hazard" },
+          { id: "l-h3", label: "No energy sources are present during maintenance", correct: false, points: 0, note: "Energy sources remain active until properly isolated.", competency: "hazard" },
+        ],
+      },
+      {
+        title: "Lockout procedure",
+        prompt: "What is the correct lockout action after identifying energy sources?",
+        context: "The worker has identified all energy sources and must now physically prevent re-energization of the conveyor motor.",
+        choices: [
+          { id: "l-r1", label: "Apply a personal lock to each energy isolation device", correct: true, points: 25, note: "Correct lockout procedure with personal locks.", competency: "response" },
+          { id: "l-r2", label: "Turn off the main switch and walk away", correct: false, points: 0, note: "A switch alone can be re-energized by others without a lock.", competency: "response" },
+          { id: "l-r3", label: "Ask a coworker to guard the switch", correct: false, points: 0, note: "Human guarding does not provide reliable energy isolation.", competency: "response" },
+        ],
+      },
+      {
+        title: "Zero energy verification",
+        prompt: "How should zero energy state be confirmed after lockout and tagout?",
+        context: "Locks and tags are in place. The worker must verify that no residual energy remains before starting maintenance.",
+        choices: [
+          { id: "l-v1", label: "Test all isolation points and bleed residual pressure to confirm zero energy", correct: true, points: 25, note: "Correct zero energy verification procedure.", competency: "route" },
+          { id: "l-v2", label: "Assume the locks are sufficient and begin work immediately", correct: false, points: 0, note: "Residual energy may remain even after lockout.", competency: "route" },
+          { id: "l-v3", label: "Check only the electrical panel and skip hydraulic verification", correct: false, points: 0, note: "All energy sources must be verified, not just electrical.", competency: "route" },
+        ],
+      },
+      {
+        title: "Try-start confirmation",
+        prompt: "After verifying zero energy, what is the final confirmation step?",
+        context: "The worker must perform one last check before beginning maintenance work on the conveyor motor.",
+        choices: [
+          { id: "l-s1", label: "Attempt to start the machine to confirm it cannot be energized, then begin work", correct: true, points: 25, note: "Correct try-start test confirms complete isolation.", competency: "safety" },
+          { id: "l-s2", label: "Skip the try-start and begin work since locks are in place", correct: false, points: 0, note: "The try-start test is a critical final verification step.", competency: "safety" },
+          { id: "l-s3", label: "Remove the lock temporarily to test the machine", correct: false, points: 0, note: "Removing locks defeats the purpose of LOTO and creates danger.", competency: "safety" },
+        ],
+      },
+    ],
+  },
 };
 
 const defaultProfile: WorkerProfile = {
@@ -342,6 +412,9 @@ export default function Page() {
   const [gasInteractionStep, setGasInteractionStep] = useState<GasInteractionStep>("detect");
   const [gasInteractionFeedback, setGasInteractionFeedback] = useState<GasInteractionFeedback | null>(null);
   const [gasPerformance, setGasPerformance] = useState<GasTrainingPerformance | null>(null);
+  const [lotoInteractionStep, setLotoInteractionStep] = useState<LotoInteractionStep>("identify");
+  const [lotoInteractionFeedback, setLotoInteractionFeedback] = useState<LotoInteractionFeedback | null>(null);
+  const [lotoPerformance, setLotoPerformance] = useState<LotoTrainingPerformance | null>(null);
   const [firePinDrag, setFirePinDrag] = useState(false);
   const fireInteractionStepRef = useRef<FireInteractionStep>("search");
   const fireAimValidRef = useRef(false);
@@ -349,6 +422,8 @@ export default function Page() {
   const fireIncorrectActionsRef = useRef(0);
   const gasExerciseStartedAtRef = useRef<number | null>(null);
   const gasIncorrectActionsRef = useRef(0);
+  const lotoExerciseStartedAtRef = useRef<number | null>(null);
+  const lotoIncorrectActionsRef = useRef(0);
   const firePinDragRef = useRef(false);
   const startFireSprayRef = useRef<(() => boolean) | null>(null);
   const stopFireSprayRef = useRef<(() => void) | null>(null);
@@ -395,6 +470,48 @@ export default function Page() {
     setGasInteractionFeedback({ status: "correct", message });
   };
 
+  const handleLotoAction = (action: LotoInteractionAction) => {
+    if (lotoInteractionStep === "complete") return;
+
+    const stepOrder: LotoInteractionAction[] = ["identify", "lockout", "tagout", "verify", "trystart"];
+    const currentIndex = stepOrder.indexOf(lotoInteractionStep as LotoInteractionAction);
+
+    if (action !== lotoInteractionStep) {
+      lotoIncorrectActionsRef.current += 1;
+      const hints: Record<LotoInteractionAction, string> = {
+        identify: "Incorrect. Identify all energy sources first.",
+        lockout: "Incorrect. Apply the lockout device next.",
+        tagout: "Incorrect. Attach the danger tag next.",
+        verify: "Incorrect. Verify zero energy state next.",
+        trystart: "Incorrect. Perform the try-start test next.",
+      };
+      setLotoInteractionFeedback({ status: "incorrect", message: hints[lotoInteractionStep as LotoInteractionAction] || "Follow the LOTO sequence." });
+      return;
+    }
+
+    const nextIndex = currentIndex + 1;
+    const nextStep: LotoInteractionStep = nextIndex >= stepOrder.length ? "complete" : stepOrder[nextIndex];
+    const messages: Record<LotoInteractionAction, string> = {
+      identify: "Correct. Energy sources identified.",
+      lockout: "Correct. Lockout device applied.",
+      tagout: "Correct. Danger tag attached.",
+      verify: "Correct. Zero energy state verified.",
+      trystart: "Correct. Try-start test passed. Machine confirmed isolated.",
+    };
+
+    if (action === "trystart") {
+      const completedAt = performance.now();
+      const startedAt = lotoExerciseStartedAtRef.current ?? completedAt;
+      setLotoPerformance({
+        completionTimeSeconds: Math.floor(Math.max(0, completedAt - startedAt) / 1000),
+        incorrectActions: lotoIncorrectActionsRef.current,
+        successfulCompletion: true,
+      });
+    }
+    setLotoInteractionStep(nextStep);
+    setLotoInteractionFeedback({ status: "correct", message: messages[action] });
+  };
+
   useEffect(() => {
     fireInteractionStepRef.current = fireInteractionStep;
   }, [fireInteractionStep]);
@@ -408,53 +525,111 @@ export default function Page() {
 
     if (screen !== "scenario") {
       window.KavachCamera?.stop();
+      // Stop web camera stream if active
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
       return;
     }
 
     const box = nativeCameraBoxRef.current;
     if (!box) return;
 
-    const getRect = () => {
-      const rect = box.getBoundingClientRect();
-      const density = window.devicePixelRatio || 1;
-      return {
-        left: rect.left * density,
-        top: rect.top * density,
-        width: rect.width * density,
-        height: rect.height * density,
+    // If running inside Capacitor native shell, use the native camera bridge
+    if (window.KavachCamera) {
+      const getRect = () => {
+        const rect = box.getBoundingClientRect();
+        const density = window.devicePixelRatio || 1;
+        return {
+          left: rect.left * density,
+          top: rect.top * density,
+          width: rect.width * density,
+          height: rect.height * density,
+        };
       };
-    };
 
-    const startCamera = () => {
-      const rect = getRect();
-      if (rect.width <= 0 || rect.height <= 0) return;
-      window.KavachCamera?.start(rect.left, rect.top, rect.width, rect.height);
-    };
+      const startCamera = () => {
+        const rect = getRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        window.KavachCamera?.start(rect.left, rect.top, rect.width, rect.height);
+      };
 
-    const updateCamera = () => {
-      const rect = getRect();
-      if (rect.width <= 0 || rect.height <= 0) {
+      const updateCamera = () => {
+        const rect = getRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+          window.KavachCamera?.stop();
+          return;
+        }
+        window.KavachCamera?.update(rect.left, rect.top, rect.width, rect.height);
+      };
+
+      startCamera();
+
+      const handleScroll = () => requestAnimationFrame(updateCamera);
+      const handleResize = () => requestAnimationFrame(updateCamera);
+
+      window.addEventListener("scroll", handleScroll, true);
+      window.addEventListener("resize", handleResize);
+
+      const timer = window.setTimeout(updateCamera, 300);
+
+      return () => {
+        window.clearTimeout(timer);
+        window.removeEventListener("scroll", handleScroll, true);
+        window.removeEventListener("resize", handleResize);
         window.KavachCamera?.stop();
-        return;
-      }
-      window.KavachCamera?.update(rect.left, rect.top, rect.width, rect.height);
-    };
+      };
+    }
 
-    startCamera();
-
-    const handleScroll = () => requestAnimationFrame(updateCamera);
-    const handleResize = () => requestAnimationFrame(updateCamera);
-
-    window.addEventListener("scroll", handleScroll, true);
-    window.addEventListener("resize", handleResize);
-
-    const timer = window.setTimeout(updateCamera, 300);
+    // Web fallback: use getUserMedia to show the camera in a <video> element
+    let cancelled = false;
+    navigator.mediaDevices
+      ?.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        // Insert a <video> element into the camera box if one doesn't exist
+        let video = box.querySelector("video.web-camera-feed") as HTMLVideoElement | null;
+        if (!video) {
+          video = document.createElement("video");
+          video.className = "web-camera-feed";
+          video.setAttribute("autoplay", "");
+          video.setAttribute("playsinline", "");
+          video.setAttribute("muted", "");
+          video.muted = true;
+          Object.assign(video.style, {
+            position: "absolute",
+            inset: "0",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            zIndex: "1",
+            transform: "scaleX(-1)",
+          });
+          box.prepend(video);
+        }
+        video.srcObject = stream;
+        video.play().catch(() => {});
+      })
+      .catch((err) => {
+        console.warn("Web camera fallback failed:", err);
+      });
 
     return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("scroll", handleScroll, true);
-      window.removeEventListener("resize", handleResize);
-      window.KavachCamera?.stop();
+      cancelled = true;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      const video = box.querySelector("video.web-camera-feed");
+      if (video) video.remove();
     };
   }, [screen, scenarioIndex]);
 
@@ -1012,6 +1187,13 @@ export default function Page() {
       gasExerciseStartedAtRef.current = null;
       gasIncorrectActionsRef.current = 0;
     }
+    if (moduleId === "loto") {
+      setLotoInteractionStep("identify");
+      setLotoInteractionFeedback(null);
+      setLotoPerformance(null);
+      lotoExerciseStartedAtRef.current = null;
+      lotoIncorrectActionsRef.current = 0;
+    }
     setScenarioIndex(0);
     setAnswers([]);
     setResultSummary(null);
@@ -1056,6 +1238,19 @@ export default function Page() {
     setGasPerformance(null);
     gasExerciseStartedAtRef.current = performance.now();
     gasIncorrectActionsRef.current = 0;
+    setScreen("scenario");
+  };
+
+  const retryLotoTraining = () => {
+    setActiveModuleId("loto");
+    setScenarioIndex(0);
+    setAnswers([]);
+    setResultSummary(null);
+    setLotoInteractionStep("identify");
+    setLotoInteractionFeedback(null);
+    setLotoPerformance(null);
+    lotoExerciseStartedAtRef.current = performance.now();
+    lotoIncorrectActionsRef.current = 0;
     setScreen("scenario");
   };
 
@@ -1347,7 +1542,7 @@ export default function Page() {
                   <article key={moduleId} className="module-card">
                     <div className="module-top">
                       <div className="module-icon" style={{ background: `${item.accent}22`, color: item.accent }}>
-                        {item.icon === "fire" ? <Flame size={20} /> : <AlertTriangle size={20} />}
+                        {item.icon === "fire" ? <Flame size={20} /> : item.icon === "loto" ? <Settings size={20} /> : <AlertTriangle size={20} />}
                       </div>
                       <span className={badge === "Competent" ? "status-badge status-good" : "status-badge status-neutral"}>{badge}</span>
                     </div>
@@ -1425,6 +1620,11 @@ export default function Page() {
                   gasIncorrectActionsRef.current = 0;
                   setGasPerformance(null);
                   setGasInteractionFeedback(null);
+                } else if (activeModuleId === "loto") {
+                  lotoExerciseStartedAtRef.current = performance.now();
+                  lotoIncorrectActionsRef.current = 0;
+                  setLotoPerformance(null);
+                  setLotoInteractionFeedback(null);
                 }
                 setScreen("scenario");
                 speak(`${currentModule.title} scenario started.`);
@@ -1485,10 +1685,10 @@ export default function Page() {
                   <span className="pill pill-success">Step {scenarioIndex + 1}/{currentModule.scenarios.length}</span>
                 </div>
 
-                <div className={`scenario-grid${activeModuleId === "gas" ? " gas-scenario-grid" : ""}`}>
+                <div className={`scenario-grid${activeModuleId === "gas" ? " gas-scenario-grid" : activeModuleId === "loto" ? " loto-scenario-grid" : ""}`}>
               <div className="scene-panel">
                 <div className="scene-header">
-                  <span>{activeModuleId === "gas" ? `Gas incident · ${currentScenario.title}` : "Analyzing surroundings"}</span>
+                  <span>{activeModuleId === "gas" ? `Gas incident · ${currentScenario.title}` : activeModuleId === "loto" ? `LOTO procedure · ${currentScenario.title}` : "Analyzing surroundings"}</span>
                   <MapPinned size={15} />
                 </div>
 
@@ -1581,6 +1781,102 @@ export default function Page() {
                       </div>
                     </div>
                   )}
+                  {activeModuleId === "loto" && (
+                    <div className={`loto-procedure-overlay${lotoInteractionStep === "complete" ? " loto-procedure-overlay-complete" : ""}`} aria-label="LOTO procedure at machinery hall">
+                      <div className="loto-procedure-header">
+                        <div className={`loto-energy-status${lotoInteractionStep === "complete" ? " loto-energy-status-safe" : ""}`}>
+                          <span className={`loto-energy-indicator${lotoInteractionStep === "complete" ? " loto-energy-indicator-off" : ""}`} aria-hidden="true" />
+                          <span>
+                            <strong>
+                              {lotoInteractionStep === "complete" ? "MACHINE ISOLATED"
+                                : lotoInteractionStep === "trystart" ? "LOCKS & TAGS APPLIED"
+                                : lotoInteractionStep === "verify" ? "TAGOUT COMPLETE"
+                                : lotoInteractionStep === "tagout" ? "LOCKOUT APPLIED"
+                                : lotoInteractionStep === "lockout" ? "ENERGY IDENTIFIED"
+                                : "ENERGY SOURCES ACTIVE"}
+                            </strong>
+                            <small>
+                              {lotoInteractionStep === "complete" ? "Procedure complete · safe to work"
+                                : lotoInteractionStep === "trystart" ? "Verify with try-start test"
+                                : lotoInteractionStep === "verify" ? "Confirm zero energy state"
+                                : "Conveyor motor · Machinery hall"}
+                            </small>
+                          </span>
+                        </div>
+                        <div className={`loto-isolation-readout${["verify", "trystart", "complete"].includes(lotoInteractionStep) ? " loto-isolation-readout-locked" : ""}`}>
+                          <Lock size={20} aria-hidden="true" />
+                          <span><strong>ISOLATION</strong><small>{["verify", "trystart", "complete"].includes(lotoInteractionStep) ? "LOCKED" : "UNLOCKED"}</small></span>
+                        </div>
+                      </div>
+
+                      <div className="loto-machine-panel" aria-label="Conveyor motor with energy isolation points">
+                        <div className="loto-machine-visual">
+                          <span className="loto-machine-object" aria-hidden="true" />
+                          <span className="loto-site-label">Conveyor motor</span>
+                        </div>
+                        {["identify", "lockout"].includes(lotoInteractionStep) && (
+                          <div className="loto-energy-hazard" aria-hidden="true"><i /><i /><i /></div>
+                        )}
+                        <div className={`loto-hazard-label${lotoInteractionStep === "complete" ? " loto-hazard-label-safe" : ""}`}>
+                          {lotoInteractionStep === "complete" ? <CheckCircle2 size={15} aria-hidden="true" /> : <Zap size={15} aria-hidden="true" />}
+                          <span>{lotoInteractionStep === "complete" ? "ENERGY ISOLATED" : "ENERGY ACTIVE"}</span>
+                        </div>
+                        <div className="loto-verification-controls">
+                          <button
+                            type="button"
+                            className={`loto-verify-control${lotoInteractionStep === "verify" ? " loto-verify-control-ready" : ["trystart", "complete"].includes(lotoInteractionStep) ? " loto-verify-control-complete" : " loto-verify-control-awaiting"}`}
+                            disabled={lotoInteractionStep !== "verify"}
+                            onClick={() => handleLotoAction("verify")}
+                          >
+                            <ShieldCheck size={16} aria-hidden="true" />
+                            <span>{lotoInteractionStep === "verify" ? "TAP TO VERIFY ZERO ENERGY" : ["trystart", "complete"].includes(lotoInteractionStep) ? "ZERO ENERGY VERIFIED" : "VERIFY ZERO ENERGY"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`loto-trystart-control${lotoInteractionStep === "trystart" ? " loto-trystart-control-ready" : lotoInteractionStep === "complete" ? " loto-trystart-control-complete" : " loto-trystart-control-awaiting"}`}
+                            disabled={lotoInteractionStep !== "trystart"}
+                            onClick={() => handleLotoAction("trystart")}
+                          >
+                            <Play size={16} aria-hidden="true" />
+                            <span>{lotoInteractionStep === "trystart" ? "TAP TO TRY-START" : lotoInteractionStep === "complete" ? "TRY-START PASSED" : "TRY-START TEST"}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="loto-equipment-row">
+                        <button
+                          type="button"
+                          className={`loto-equipment-item loto-equipment-control${lotoInteractionStep === "identify" ? " loto-equipment-control-ready" : " loto-equipment-control-complete"}`}
+                          disabled={lotoInteractionStep === "complete"}
+                          onClick={() => handleLotoAction("identify")}
+                        >
+                          <Zap size={17} aria-hidden="true" />
+                          <span>Energy ID</span>
+                          <strong>{lotoInteractionStep === "identify" ? "Tap to identify" : "Identified"}</strong>
+                        </button>
+                        <button
+                          type="button"
+                          className={`loto-equipment-item loto-equipment-control${lotoInteractionStep === "lockout" ? " loto-equipment-control-ready" : ["tagout", "verify", "trystart", "complete"].includes(lotoInteractionStep) ? " loto-equipment-control-complete" : " loto-equipment-control-awaiting"}`}
+                          disabled={lotoInteractionStep === "complete"}
+                          onClick={() => handleLotoAction("lockout")}
+                        >
+                          <Lock size={17} aria-hidden="true" />
+                          <span>Lock device</span>
+                          <strong>{lotoInteractionStep === "lockout" ? "Tap to lock" : ["tagout", "verify", "trystart", "complete"].includes(lotoInteractionStep) ? "Locked" : "Lock device"}</strong>
+                        </button>
+                        <button
+                          type="button"
+                          className={`loto-equipment-item loto-equipment-control${lotoInteractionStep === "tagout" ? " loto-equipment-control-ready" : ["verify", "trystart", "complete"].includes(lotoInteractionStep) ? " loto-equipment-control-complete" : " loto-equipment-control-awaiting"}`}
+                          disabled={lotoInteractionStep === "complete"}
+                          onClick={() => handleLotoAction("tagout")}
+                        >
+                          <Tag size={17} aria-hidden="true" />
+                          <span>Danger tag</span>
+                          <strong>{lotoInteractionStep === "tagout" ? "Tap to tag" : ["verify", "trystart", "complete"].includes(lotoInteractionStep) ? "Tagged" : "Danger tag"}</strong>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {activeModuleId === "gas" && (
                   <div className="gas-interaction-task" role="status" aria-live="polite">
@@ -1597,6 +1893,52 @@ export default function Page() {
                           <div><span>Successful</span><b>{gasPerformance.successfulCompletion ? "Yes" : "No"}</b></div>
                         </div>
                         <button type="button" className="gas-retry-button" onClick={retryGasTraining}>Retry Training</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {activeModuleId === "loto" && (
+                  <div className="loto-interaction-task" role="status" aria-live="polite">
+                    <span>
+                      {lotoInteractionStep === "identify" ? "REQUIRED ACTION · 1 OF 5"
+                        : lotoInteractionStep === "lockout" ? "REQUIRED ACTION · 2 OF 5"
+                        : lotoInteractionStep === "tagout" ? "REQUIRED ACTION · 3 OF 5"
+                        : lotoInteractionStep === "verify" ? "REQUIRED ACTION · 4 OF 5"
+                        : lotoInteractionStep === "trystart" ? "REQUIRED ACTION · 5 OF 5"
+                        : "PROCEDURE COMPLETE"}
+                    </span>
+                    <strong>
+                      {lotoInteractionStep === "identify" ? "Identify energy sources"
+                        : lotoInteractionStep === "lockout" ? "Apply lockout device"
+                        : lotoInteractionStep === "tagout" ? "Attach danger tag"
+                        : lotoInteractionStep === "verify" ? "Verify zero energy"
+                        : lotoInteractionStep === "trystart" ? "Perform try-start test"
+                        : "LOTO procedure complete"}
+                    </strong>
+                    {lotoInteractionFeedback && (
+                      <p className={`loto-action-feedback loto-action-feedback-${lotoInteractionFeedback.status}`} aria-live="polite">
+                        {lotoInteractionFeedback.message}
+                      </p>
+                    )}
+                    <p className="loto-next-action">
+                      <strong>{lotoInteractionStep === "complete" ? "Status:" : "Next:"}</strong>
+                      {" "}
+                      {lotoInteractionStep === "identify" ? "Tap the energy identifier."
+                        : lotoInteractionStep === "lockout" ? "Tap the lock device."
+                        : lotoInteractionStep === "tagout" ? "Tap the danger tag."
+                        : lotoInteractionStep === "verify" ? "Tap verify zero energy."
+                        : lotoInteractionStep === "trystart" ? "Tap the try-start button."
+                        : "Machine safely isolated. Maintain LOTO until work is complete."}
+                    </p>
+                    {lotoInteractionStep === "complete" && lotoPerformance && (
+                      <div className="loto-performance-results" aria-label="LOTO training performance">
+                        <strong>Training performance</strong>
+                        <div className="loto-performance-grid">
+                          <div><span>Completion time</span><b>{formatLotoCompletionTime(lotoPerformance.completionTimeSeconds)}</b></div>
+                          <div><span>Incorrect actions</span><b>{lotoPerformance.incorrectActions}</b></div>
+                          <div><span>Successful</span><b>{lotoPerformance.successfulCompletion ? "Yes" : "No"}</b></div>
+                        </div>
+                        <button type="button" className="loto-retry-button" onClick={retryLotoTraining}>Retry Training</button>
                       </div>
                     )}
                   </div>
@@ -1936,6 +2278,11 @@ export default function Page() {
                     <span>Gas</span>
                     <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.min(100, attempts.filter((attempt) => attempt.moduleId === "gas").length * 30)}%` }} /></div>
                     <strong>{attempts.filter((attempt) => attempt.moduleId === "gas").length}</strong>
+                  </div>
+                  <div className="activity-row">
+                    <span>LOTO</span>
+                    <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.min(100, attempts.filter((attempt) => attempt.moduleId === "loto").length * 30)}%` }} /></div>
+                    <strong>{attempts.filter((attempt) => attempt.moduleId === "loto").length}</strong>
                   </div>
                 </div>
               </article>
